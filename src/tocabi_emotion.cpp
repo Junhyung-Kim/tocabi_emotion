@@ -6,7 +6,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "tocabi_emotion_node");
     ros::NodeHandle nh;
 
-	tocabi_emotion_sub = nh.subscribe("tocabi/emotion", 1, emotionCallback);
+	tocabi_emotion_sub = nh.subscribe("/tocabi/emotion", 1, emotionCallback);
 	ros::Rate loop_rate(10);
 
 	fd = open(serialport, O_RDWR | O_NOCTTY );
@@ -14,6 +14,7 @@ int main(int argc, char **argv)
 	if(fd<0)
 	{
 		printf("serial port is error");
+		return fd;
 	}
 	else
 	{
@@ -40,8 +41,10 @@ int main(int argc, char **argv)
         if(a<0)
 	    {
 		    printf("write error");
+			return a;
 	    }
 
+		ros::spinOnce();
 		loop_rate.sleep();
 	}
 
