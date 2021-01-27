@@ -8,7 +8,7 @@
 #include <termios.h>
 #include <fcntl.h>
 
-char serialport[]= "/dev/tty0";
+char serialport[]= "/dev/ttyACM0";
 
 int fd, a;
 struct termios port_settings; 
@@ -16,6 +16,7 @@ struct termios port_settings;
 ros::Subscriber tocabi_emotion_sub;
 
 int em;
-char cmd[] = {'0'};
+bool callback = false;
+//char cmd[] = {'0'};
 
 void emotionCallback(const std_msgs::Int64::ConstPtr &msg);
