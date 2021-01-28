@@ -3,23 +3,34 @@
 int main(int argc, char **argv)
 {
 
-    ros::init(argc, argv, "tocabi_emotion_node");
-    ros::NodeHandle nh;
+	ros::init(argc, argv, "tocabi_emotion_node");
+	ros::NodeHandle nh;
 
 	tocabi_emotion_sub = nh.subscribe("tocabi/emotion", 1, emotionCallback);
 	hand_force_pub = nh.advertise<std_msgs::Float64MultiArray>("/tocabi/handforce" , 1);
-	ros::Rate loop_rate(1000);
+	ros::Rate loop_rate(2);
+
+	for(int i = 0; i < 9; i++)
+	{
+		force_msg.data.push_back(0.0);
+	}
+
+	for(int i = 0; i < 9; i++)
+	{
+		force_msg_prev.data.push_back(0.0);
+	}
+
 
 	fd = open(serialport, O_RDWR | O_NOCTTY);  //FACE
-	fd1 = open(serialport1, O_RDWR | O_NOCTTY); //FT
+	fd1 = open(serialport1, O_RDWR | O_NOCTTY| O_NDELAY); //FT
 	if(fd<0)
 	{
-		printf("serial port1 is error \n");
+		//printf("serial port1 is error \n");
 	}
 	else
 	{
 	//	fcntl(fd, F_SETFL, 0);
-		printf("port1 is open.\n");
+		//printf("port1 is open.\n");
 	}
 
 	if(fd1<0)
@@ -28,7 +39,7 @@ int main(int argc, char **argv)
 	}
 	else
 	{
-	//	fcntl(fd, F_SETFL, 0);
+		fcntl(fd, F_SETFL, 0);
 		printf("port2 is open.\n");
 	}
  
@@ -47,23 +58,10 @@ int main(int argc, char **argv)
 	port_settings1.c_cflag &= ~CSTOPB;
 	port_settings1.c_cflag &= ~CSIZE;
 	port_settings1.c_cflag |= CS8;
-	port_settings1.c_cflag &= ~CRTSCTS; // Disable RTS/CTS hardware flow control (most common)
-	port_settings1.c_cflag |= CREAD | CLOCAL; // Turn on READ & ignore ctrl lines (CLOCAL = 1)
 
-	port_settings1.c_lflag &= ~ICANON;
-	port_settings1.c_lflag &= ~ECHO; // Disable echo
-	port_settings1.c_lflag &= ~ECHOE; // Disable erasure
-	port_settings1.c_lflag &= ~ECHONL; // Disable new-line echo
-	port_settings1.c_lflag &= ~ISIG; // Disable interpretation of INTR, QUIT and SUSP
-	port_settings1.c_iflag &= ~(IXON | IXOFF | IXANY); // Turn off s/w flow ctrl
-	port_settings1.c_iflag &= ~(IGNBRK|BRKINT|PARMRK|ISTRIP|INLCR|IGNCR|ICRNL); // Disable any special handling of received bytes
 
-	port_settings1.c_oflag &= ~OPOST;
-	port_settings1.c_oflag &= ~ONLCR; 
+	tcflush(fd1, TCIFLUSH);
 
-	port_settings1.c_cc[VTIME] = 10;
-	port_settings1.c_cc[VMIN] = 0;
-	
 	tcsetattr(fd, TCSANOW, &port_settings); 
 	tcsetattr(fd1, TCSANOW, &port_settings1); 
 	
@@ -99,41 +97,77 @@ int main(int argc, char **argv)
 			callback = false;
 		}
 		
-        if(a<0)
-	    {
-		    printf("Write port1 error \n");
-	    }
+            	if(a<0)
+	    	{
+		   //  printf("Write port1 error \n");
+	   	}
 
-		char read_buf[90];
+		char read_buf[60];
 		a  = read(fd1, read_buf, sizeof(read_buf));
 
 		if(a<0)
-	    {
+	    	{
 		    printf("Read port2 error \n");
-	    }
+	    	}
 
+		int row = 0;
 		std::string read_data(read_buf);
-		std::cout << "read data : " << read_data << std::endl;
-
-		std::vector<double> vect;
+		std::vector<std::vector<double>> vect(3);
 		std::stringstream ss(read_data);
-		double num;	
+		double num;
+		std::string read_line;
 
-		while(ss>>num) {
-			vect.push_back(num);    
-			if (ss.peek() == ',')
-				ss.ignore();
+		while(std::getline(ss, read_line))
+		{
+			std::stringstream ss1(read_line);
+
+			//std::cout << "row "  << read_line << std::endl;
+			while(ss1>>num) {	
+
+			//std::cout << "num "  << num << std::endl;
+				vect[row].push_back(num);   
+				if (ss1.peek() == ',')
+					ss1.ignore();
+				//std::cout << "col" << std::endl;
+			}
+			row++;
 		}
 
-	/*	for (std::size_t i = 0; i < vect.size(); i++)
-			std::cout << "vector " << vect[i] << std::endl;
-	*/
+		for(int i=0; i<row; i++)
+		{	
+			for(std::size_t j = 0; j < vect[i].size(); j++)
+			{
+				//std::cout << "vector " << i << ", " << j<< " " <<vect[i][j] << std::endl;
+			}
+		}
+	
 		for(int i = 0; i < 5; i++)
 		{
-			force_msg.data[i] = vect[i];
+			if(vect[0].size() == 5)
+			{
+				force_msg.data[i] = vect[0][i];
+			}
+			else if(vect[1].size() == 5)
+			{
+				force_msg.data[i] = vect[1][i];
+			}
+			else if(vect[2].size() == 5)
+			{
+				force_msg.data[i] = vect[2][i];
+			}
+			else
+			{
+				force_msg.data = force_msg_prev.data;
+			}
 		}
 
+		for(int j = 0; j < 5; j++)
+			std::cout << "rosmsg " << j << " " << force_msg.data[j] << std::endl;
+
+
 		hand_force_pub.publish(force_msg);
+
+		force_msg_prev.data = force_msg.data;
 
 
 		ros::spinOnce();

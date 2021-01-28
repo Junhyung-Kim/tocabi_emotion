@@ -7,6 +7,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <istream>
 #include <iostream>
 #include <fcntl.h>
 #include "ros/ros.h"
@@ -24,6 +25,7 @@ ros::Subscriber tocabi_emotion_sub;
 ros::Publisher hand_force_pub;
 
 std_msgs::Float64MultiArray force_msg;
+std_msgs::Float64MultiArray force_msg_prev;
 
 int em;
 bool callback = false;
