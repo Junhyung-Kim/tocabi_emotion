@@ -7,22 +7,32 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
 
 	tocabi_emotion_sub = nh.subscribe("tocabi/emotion", 1, emotionCallback);
+	hand_force_pub = nh.advertise<std_msgs::Float64MultiArray>("/tocabi/handforce" , 1);
 	ros::Rate loop_rate(1000);
 
 	fd = open(serialport, O_RDWR | O_NOCTTY);  //FACE
 	fd1 = open(serialport1, O_RDWR | O_NOCTTY); //FT
-
 	if(fd<0)
 	{
-		printf("serial port is error \n");
+		printf("serial port1 is error \n");
 	}
 	else
 	{
 	//	fcntl(fd, F_SETFL, 0);
-		printf("port is open.\n");
+		printf("port1 is open.\n");
+	}
+
+	if(fd1<0)
+	{
+		printf("serial port2 is error \n");
+	}
+	else
+	{
+	//	fcntl(fd, F_SETFL, 0);
+		printf("port2 is open.\n");
 	}
  
-    struct termios port_settings;      
+    struct termios port_settings, port_settings1;      
 	cfsetispeed(&port_settings, B115200);    
 	cfsetospeed(&port_settings, B115200);
 	cfsetispeed(&port_settings1, B115200);    
@@ -55,6 +65,7 @@ int main(int argc, char **argv)
 	port_settings1.c_cc[VMIN] = 0;
 	
 	tcsetattr(fd, TCSANOW, &port_settings); 
+	tcsetattr(fd1, TCSANOW, &port_settings1); 
 	
 	while (ros::ok())	
 	{
@@ -90,8 +101,41 @@ int main(int argc, char **argv)
 		
         if(a<0)
 	    {
-		    printf("write error \n");
+		    printf("Write port1 error \n");
 	    }
+
+		char read_buf[90];
+		a  = read(fd1, read_buf, sizeof(read_buf));
+
+		if(a<0)
+	    {
+		    printf("Read port2 error \n");
+	    }
+
+		std::string read_data(read_buf);
+		std::cout << "read data : " << read_data << std::endl;
+
+		std::vector<double> vect;
+		std::stringstream ss(read_data);
+		double num;	
+
+		while(ss>>num) {
+			vect.push_back(num);    
+			if (ss.peek() == ',')
+				ss.ignore();
+		}
+
+	/*	for (std::size_t i = 0; i < vect.size(); i++)
+			std::cout << "vector " << vect[i] << std::endl;
+	*/
+		for(int i = 0; i < 5; i++)
+		{
+			force_msg.data[i] = vect[i];
+		}
+
+		hand_force_pub.publish(force_msg);
+
+
 		ros::spinOnce();
 		loop_rate.sleep();
 	}
